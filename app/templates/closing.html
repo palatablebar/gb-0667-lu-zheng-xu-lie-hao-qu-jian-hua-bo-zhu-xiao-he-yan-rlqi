@@ -1,0 +1,84 @@
+{% extends "base.html" %}{% from "base.html" import table with context %}
+{% block content %}
+<div class="grid">
+  <section class="panel">
+    <div class="panel__head"><h2>来源批次</h2><span class="panel__meta">{{ summary.source_batch_count }} 条</span></div>
+    {{ table(ledger.source_batches,[('source_label','来源'),('batch','批号'),('start','起号'),('end','止号')]) }}
+  </section>
+
+  <section class="panel">
+    <div class="panel__head"><h2>待确认差异</h2>
+      <span class="state state--warn">{{ summary.pending }} 区间挂账</span></div>
+    {% set pending_rows=ledger.entries|selectattr('superseded','equalto',false)|rejectattr('status','in',['TRANSFERRED','CANCELLED'])|list %}
+    {% if pending_rows %}
+    <div class="panel__body panel__body--scroll">
+      <table class="ledger">
+        <thead><tr><th>批号</th><th>区间</th><th>张数</th><th>结论</th><th>来源</th><th>补凭据</th></tr></thead>
+        <tbody>
+        {% for e in pending_rows %}
+        <tr>
+          <td>{{ e.batch }}</td>
+          <td class="serial">{{ e.start }}…{{ e.end }}</td>
+          <td class="num">{{ e.quantity }}</td>
+          <td><span class="state state--warn">{{ e.status_label }}</span></td>
+          <td title="{{ e.source_labels|join('、') }}">{{ e.sources|join('/') }}</td>
+          <td>
+            <button class="btn evidence-btn" data-key="{{ e.interval_key }}" data-current="{{ e.status }}">受理凭据</button>
+          </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}<div class="empty">无待确认差异，可执行关账。</div>{% endif %}
+    <div class="panel__body">
+      <div class="keyline"><span>正式账版本</span><b class="num">V{{ ledger.version }}</b></div>
+      <div class="keyline"><span>重生成次数</span><b class="num">{{ ledger.regenerations }}</b></div>
+      <div class="keyline"><span>凭据留痕</span><b class="num">{{ ledger.evidence_log|length }} 条</b></div>
+      {% if ledger.last_error %}<p class="error">上次重生成失败，旧版保留：{{ ledger.last_error }}</p>{% endif %}
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="panel__head"><h2>最终状态</h2>
+      <span class="state {% if ledger.status!='CLOSED' %}state--warn{% endif %}">{{ '已关账' if ledger.status=='CLOSED' else '正式挂账' }}</span></div>
+    <div class="panel__body">
+      <div class="keyline"><span>区间总数</span><b class="num">{{ summary.total_intervals }}</b></div>
+      <div class="keyline"><span>终态区间</span><b class="num">{{ summary.final }}</b></div>
+      {% for label,count in summary.by_status.items() %}
+      <div class="keyline"><span>{{ label }}</span><b class="num">{{ count }}</b></div>
+      {% endfor %}
+      <button class="btn btn--primary" id="close-ledger" {% if not summary.can_close %}disabled{% endif %}>关账</button>
+    </div>
+    <div class="panel__head"><h2>状态迁移留痕</h2><span class="panel__meta">{{ ledger.audit|length }} 步</span></div>
+    {{ table(ledger.audit,[('interval_key','区间键'),('old_status','原状态'),('new_status','新状态'),('reason','原因')]) }}
+  </section>
+
+  <section class="panel span-all">
+    <div class="panel__head"><h2>正式差异账全量区间</h2>
+      <span class="panel__meta">同区间仅一个结论 · 凭据换发不丢记录</span></div>
+    {{ table(ledger.entries|selectattr('superseded','equalto',false)|list,
+      [('batch','批号'),('start','起号'),('end','止号'),('quantity','张数'),('status_label','结论'),('source_labels','命中来源')]) }}
+  </section>
+</div>
+
+<template id="evidence-form">
+  <div class="panel__body" id="evidence-panel">
+    <input type="hidden" id="ev-key">
+    <div class="field"><label>凭据类型</label>
+      <select id="ev-kind">
+        <option value="exchange_receipt">交易所受理回执</option>
+        <option value="registry_notice">注销登记通知</option>
+        <option value="correction">更正凭据</option>
+      </select></div>
+    <div class="field"><label>受理号 / 凭据编号</label><input class="field__input" id="ev-ref" placeholder="如 EX-RCP-202611-0088"></div>
+    <div class="field"><label>说明</label><textarea id="ev-detail" placeholder="补回凭据仅修正该区间"></textarea></div>
+    <div class="field"><label>修正后结论（互斥状态机校验）</label>
+      <select id="ev-target">
+        <option value="TRANSFERRED">已划出（受理回执齐备）</option>
+        <option value="CANCELLED">已注销（注销登记齐备）</option>
+      </select></div>
+    <button class="btn btn--primary" id="ev-submit">提交凭据</button>
+  </div>
+</template>
+{% endblock %}

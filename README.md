@@ -26,6 +26,7 @@ docker compose up --build -d
 - 问题隔离：`/quarantine`，`GET/POST /api/quarantine`。
 - 持仓对账：`/reconcile`，`GET/POST /api/reconcile`。
 - 批次归档：`/batches`，`GET/POST /api/batches`。
+- 月末关账：`/closing`，`GET /api/closing`、`POST /api/closing/generate`、`POST /api/closing/evidence`、`POST /api/closing/close`。
 
 [接口文档](http://localhost:18206/docs)。
 
@@ -47,3 +48,15 @@ docker compose exec -T app pytest -q
 不覆盖外部登记系统同步、跨批次证书合并；演示范围为单个上传文件完整重放。
 
 序列号最多40位，持仓和注销区间按签发宽度保留前导零。
+
+## 月末关账差异账
+
+内部持仓、交易所回执、注销登记先后到达时，按下列裁决处理，避免“等齐才关账”与“无回执记已划出”互相牵制：
+
+- **未回执区间按期进正式差异账**，落为`待确认/回执缺口`等挂账状态，绝不写成`已划出`；三源齐备才给终态`已划出/已注销`。
+- **补回凭据只修正受影响区间**：凭据追加留痕、不覆盖历史，旧凭据软保留；每次修订递增版本，旧版本号返回409。
+- **同区间不出现互斥结论**：状态走白名单状态机，终态（已划出/已注销）不可回退，非法迁移返回`MUTEX_STATUS`。
+- **重新生成失败保留旧版**：新版本在单事务内整体替换，异常回滚并登记`last_error`；输入未变的重跑不新增记录、不升版。
+- 关账前强制清零待确认差异，否则返回`PENDING_OPEN`。
+
+页面 `/closing` 三栏核对：来源批次、待确认差异（可逐区间补受理凭据）、最终状态（含状态迁移留痕）。
