@@ -1,0 +1,24 @@
+:root {
+ --bg:#f3f0e8;
+ --rail:#ebe5d8;
+ --panel:#fffef9;
+ --panel-2:#f6f3e9;
+ --ink:#28271e;
+ --ink-2:#6b6859;
+ --line:#d2cbb9;
+ --line-2:#aca38b;
+ --accent:#8d701a;
+ --accent-ink:#ffffff;
+ --ok:#28734c;
+ --warn:#9b6b18;
+ --bad:#b33c32;
+ --info:#536476;
+ --ui:"PingFang SC","Microsoft YaHei",sans-serif;
+ --mono:"SFMono-Regular",Consolas,monospace;
+ --doc:"Songti SC","Noto Serif CJK SC",Georgia,serif;
+ --radius:0px;
+ --pad:19px;
+ --gap:17px;
+ --row:36px;
+ --bar:52px;
+}
